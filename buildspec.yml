@@ -1,0 +1,42 @@
+version: 0.2
+
+env:
+  variables:
+    REGION: ap-south-1
+    REPO: brain-tasks-app
+
+phases:
+  pre_build:
+    commands:
+      - echo "Logging in to Amazon ECR..."
+      - ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+      - IMAGE_TAG=${CODEBUILD_RESOLVED_SOURCE_VERSION:0:7}
+      - IMAGE_URI="$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$REPO:$IMAGE_TAG"
+      - aws ecr describe-repositories --repository-names $REPO --region $REGION >/dev/null 2>&1 || \
+        aws ecr create-repository --repository-name $REPO --image-scanning-configuration scanOnPush=true --region $REGION
+      - aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com
+
+  build:
+    commands:
+      - echo "Building Docker image..."
+      - docker build -t $REPO:$IMAGE_TAG .
+      - docker tag $REPO:$IMAGE_TAG $IMAGE_URI
+      - docker tag $REPO:$IMAGE_TAG $ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$REPO:latest
+
+  post_build:
+    commands:
+      - echo "Pushing Docker image to ECR..."
+      - docker push $IMAGE_URI
+      - docker push $ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$REPO:latest
+      - echo "Rendering Kubernetes manifests..."
+      - mkdir -p artifact/k8s
+      - sed "s#{{IMAGE_URI}}#$IMAGE_URI#g" k8s/deployment.yaml > artifact/k8s/deployment.yaml
+      - cp k8s/service.yaml artifact/k8s/service.yaml
+      - printf '{"imageUri":"%s"}' "$IMAGE_URI" > artifact/imageDetail.json
+
+artifacts:
+  files:
+    - appspec.yml
+    - scripts/**/*
+    - artifact/**/*
+  discard-paths: no

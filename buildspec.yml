@@ -1,6 +1,5 @@
 version: 0.2
 
-# Use Bash explicitly for substring compatibility
 env:
   shell: bash
   variables:
@@ -11,14 +10,12 @@ phases:
   pre_build:
     commands:
       - echo "=== Pre-build: Login to Amazon ECR ==="
-      - ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text) # get AWS account ID
+      - ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text) # AWS account ID
       - IMAGE_TAG=${CODEBUILD_RESOLVED_SOURCE_VERSION:0:7} # first 7 chars of commit hash
       - IMAGE_URI="$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$REPO:$IMAGE_TAG"
       - echo "Using image URI: $IMAGE_URI"
-      # Check if repository exists; create if not
       - aws ecr describe-repositories --repository-names $REPO --region $REGION >/dev/null 2>&1 || \
         aws ecr create-repository --repository-name $REPO --image-scanning-configuration scanOnPush=true --region $REGION
-      - echo "Logging in to ECR..."
       - aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com
 
   build:
@@ -31,7 +28,7 @@ phases:
     commands:
       - echo "=== Push Docker image to ECR ==="
       - docker push $IMAGE_URI
-      - echo "=== Render Kubernetes manifests with new image URI ==="
+      - echo "=== Render Kubernetes manifests ==="
       - mkdir -p artifact/k8s
       - sed "s#{{IMAGE_URI}}#$IMAGE_URI#g" k8s/deployment.yaml > artifact/k8s/deployment.yaml
       - cp k8s/service.yaml artifact/k8s/service.yaml
@@ -44,3 +41,4 @@ artifacts:
     - scripts/**/*
     - artifact/**/*
   discard-paths: no
+

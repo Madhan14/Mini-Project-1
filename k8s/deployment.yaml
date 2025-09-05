@@ -1,0 +1,40 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: brain-tasks
+  namespace: brain
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: brain-tasks
+  template:
+    metadata:
+      labels:
+        app: brain-tasks
+    spec:
+      containers:
+        - name: web
+          # Placeholder will be replaced in CI/CD
+          image: 333650976464.dkr.ecr.ap-south-1.amazonaws.com/brain-tasks:v1
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "250m"
+              memory: "256Mi"

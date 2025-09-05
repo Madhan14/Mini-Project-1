@@ -1,0 +1,10 @@
+version: 0.0
+os: linux
+files:
+  - source: /
+    destination: /opt/brain/app
+hooks:
+  AfterInstall:
+    - location: scripts/deploy_to_eks.sh
+      timeout: 300
+      runas: root

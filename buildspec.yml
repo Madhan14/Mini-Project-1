@@ -1,38 +1,39 @@
 version: 0.2
 
 env:
-  shell: bash
   variables:
     REGION: ap-south-1
     REPO: brain-tasks
+    CLUSTER: brain-tasks
 
 phases:
   pre_build:
     commands:
-      - echo "=== Pre-build: Login to Amazon ECR ==="
+      - echo "Starting pre-build phase..."
+      - echo "Getting AWS account ID..."
       - ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+      - echo "Logging in to ECR..."
+      - aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com
       - IMAGE_TAG=${CODEBUILD_RESOLVED_SOURCE_VERSION:0:7}
       - IMAGE_URI="$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$REPO:$IMAGE_TAG"
-      - echo "Using image URI: $IMAGE_URI"
-      - aws ecr describe-repositories --repository-names $REPO --region $REGION >/dev/null 2>&1 || aws ecr create-repository --repository-name $REPO --image-scanning-configuration scanOnPush=true --region $REGION
-      - aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com
+      - echo "Checking if ECR repository exists..."
+      - aws ecr describe-repositories --repository-names $REPO --region $REGION || aws ecr create-repository --repository-name $REPO --region $REGION
 
   build:
     commands:
-      - echo "=== Build Docker image (multi-stage) ==="
+      - echo "Building Docker image..."
       - docker build -t $REPO:$IMAGE_TAG .
       - docker tag $REPO:$IMAGE_TAG $IMAGE_URI
 
   post_build:
     commands:
-      - echo "=== Push Docker image to ECR ==="
+      - echo "Pushing Docker image to ECR..."
       - docker push $IMAGE_URI
-      - echo "=== Render Kubernetes manifests ==="
+      - echo "Rendering Kubernetes manifests..."
       - mkdir -p artifact/k8s
       - sed "s#{{IMAGE_URI}}#$IMAGE_URI#g" k8s/deployment.yaml > artifact/k8s/deployment.yaml
       - cp k8s/service.yaml artifact/k8s/service.yaml
-      - printf '{"imageUri":"%s"}' "$IMAGE_URI" > artifact/imageDetail.json
-      - echo "Build & Push completed successfully."
+      - echo "Build & push completed successfully on `date`"
 
 artifacts:
   files:

@@ -10,8 +10,8 @@ phases:
   pre_build:
     commands:
       - echo "=== Pre-build: Login to Amazon ECR ==="
-      - ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text) # AWS account ID
-      - IMAGE_TAG=${CODEBUILD_RESOLVED_SOURCE_VERSION:0:7} # first 7 chars of commit hash
+      - ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+      - IMAGE_TAG=${CODEBUILD_RESOLVED_SOURCE_VERSION:0:7}
       - IMAGE_URI="$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$REPO:$IMAGE_TAG"
       - echo "Using image URI: $IMAGE_URI"
       - aws ecr describe-repositories --repository-names $REPO --region $REGION >/dev/null 2>&1 || \
@@ -20,7 +20,7 @@ phases:
 
   build:
     commands:
-      - echo "=== Build Docker image ==="
+      - echo "=== Build Docker image (multi-stage) ==="
       - docker build -t $REPO:$IMAGE_TAG .
       - docker tag $REPO:$IMAGE_TAG $IMAGE_URI
 
@@ -41,4 +41,3 @@ artifacts:
     - scripts/**/*
     - artifact/**/*
   discard-paths: no
-

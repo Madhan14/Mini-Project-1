@@ -1,47 +1,21 @@
 version: 0.2
 
-env:
-  variables:
-    REGION: ap-south-1
-    REPO: brain-tasks
-    CLUSTER: brain-tasks
-
 phases:
   pre_build:
     commands:
-      - echo "=== Pre-build phase ==="
-      - echo "Getting AWS account ID..."
-      - ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-      - echo "ACCOUNT_ID = $ACCOUNT_ID"
-      - echo "REGION = $REGION"
-      - echo "Commit ID = $CODEBUILD_RESOLVED_SOURCE_VERSION"
-      - IMAGE_TAG=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
-      - IMAGE_URI=$ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/$REPO:$IMAGE_TAG
-      - echo "Image URI = $IMAGE_URI"
-      - aws ecr describe-repositories --repository-names $REPO --region $REGION >/dev/null 2>&1 || \
-        aws ecr create-repository --repository-name $REPO --image-scanning-configuration scanOnPush=true --region $REGION
       - echo "Logging in to Amazon ECR..."
-      - aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com
+      - aws --version
+      - aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin 333650976464.dkr.ecr.ap-south-1.amazonaws.com
 
   build:
     commands:
-      - echo "=== Build phase ==="
-      - docker build -t $REPO:$IMAGE_TAG .
-      - docker tag $REPO:$IMAGE_TAG $IMAGE_URI
+      - echo "Building Docker image..."
+      - docker build -t brain-tasks:latest .
+      - docker tag brain-tasks:latest 333650976464.dkr.ecr.ap-south-1.amazonaws.com/brain-tasks
 
   post_build:
     commands:
-      - echo "=== Post-build phase ==="
-      - docker push $IMAGE_URI
-      - mkdir -p artifact/k8s
-      - sed "s#{{IMAGE_URI}}#$IMAGE_URI#g" k8s/deployment.yaml > artifact/k8s/deployment.yaml
-      - cp k8s/service.yaml artifact/k8s/service.yaml
-      - printf '{"imageUri":"%s"}' "$IMAGE_URI" > artifact/imageDetail.json
-      - echo "✅ Build & Push completed successfully."
-
-artifacts:
-  files:
-    - appspec.yml
-    - scripts/**/*
-    - artifact/**/*
-  discard-paths: no
+      - echo "Pushing Docker image to ECR..."
+      - docker push 333650976464.dkr.ecr.ap-south-1.amazonaws.com/brain-tasks
+      - echo "Writing image definitions file..."
+      
